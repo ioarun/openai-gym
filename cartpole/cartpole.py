@@ -1,5 +1,6 @@
 '''
 The state features are : [cart_position, pole_angle, cart_velocity, angle_rate_of_change]
+Find the OpenAI gym at https://gym.openai.com/evaluations/eval_IkBgtzYaRNahmH9hra0gw
 '''
 
 from neuralnet import Network
