@@ -1,6 +1,9 @@
 '''
 This code uses Policy gradient algorithm called REINFORCE to solve
 OpenAI Gym's CartPole balancing problem.
+
+Find evaluation at : https://gym.openai.com/evaluations/eval_MkKDu7AS1mcfffi7LWeg
+
 '''
 
 import tensorflow as tf
@@ -55,6 +58,7 @@ reward_sum = 0
 episode_number = 1
 total_episodes = 10000
 init = tf.initialize_all_variables()
+#env.monitor.start('cartpole-policygradient-monitor/', force=True)
 
 # Launch the graph
 with tf.Session() as sess:
@@ -69,11 +73,11 @@ with tf.Session() as sess:
         gradBuffer[ix] = grad * 0
     
     while episode_number <= total_episodes:
-       
+       	
         if reward_sum/batch_size > 100 or rendering == True : 
             env.render()
             rendering = True
-            
+        
         # Make sure the observation is in a shape the network can handle.
         x = np.reshape(observation,[1,D])
         
@@ -132,4 +136,5 @@ with tf.Session() as sess:
             observation = env.reset()
         
 print (episode_number,'Episodes completed.')
+#env.monitor.close()
 
