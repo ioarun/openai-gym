@@ -13,6 +13,7 @@ import random
 import copy
 
 env = gym.make("MountainCar-v0")
+env.monitor.start("mountain-car-monitor")
 
 learning_rate = 1e-2
 memory_size = 100000
@@ -44,7 +45,7 @@ with tf.Session() as sess:
 	sess.run(init)
 	state_memory = []
 	target_memory = []
-	for  _ in range(10000):
+	for  _ in range(1000):
 		done = False
 		state = env.reset()
 		total_reward = 0
@@ -66,7 +67,7 @@ with tf.Session() as sess:
 				new_state, reward, done, info = env.step(action)
 
 			total_reward += reward
-			env.render()
+			#env.render()
 
 			_Qout = sess.run(Qpredict, feed_dict={observations: np.reshape(new_state, [1, 2])})
 			_maxQout = np.max(_Qout)
@@ -96,3 +97,6 @@ with tf.Session() as sess:
 				state_memory = []
 				target_memory = []
 		print "reward in episode ",_, " is ", total_reward
+
+env.monitor.close()
+gym.upload('mountain-car-monitor',api_key='sk_hJZ4gpibQk2YheXyJUYHzQ')
