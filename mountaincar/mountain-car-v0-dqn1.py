@@ -13,7 +13,6 @@ import random
 import copy
 
 env = gym.make("MountainCar-v0")
-env.monitor.start("mountain-car-monitor")
 
 learning_rate = 1e-2
 memory_size = 100000
@@ -97,6 +96,3 @@ with tf.Session() as sess:
 				state_memory = []
 				target_memory = []
 		print "reward in episode ",_, " is ", total_reward
-
-env.monitor.close()
-gym.upload('mountain-car-monitor',api_key='sk_hJZ4gpibQk2YheXyJUYHzQ')
