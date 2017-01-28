@@ -126,7 +126,7 @@ def copy_model_parameters(sess):
 
 	update_ops = []
 	for e_v, t_v in zip(e_params, t_params):
-		op = t_params.assign(e_params)
+		op = t_v.assign(e_v)
 		update_ops.append(op)
 	sess.run(update_ops)
 
