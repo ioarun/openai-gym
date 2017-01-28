@@ -12,6 +12,7 @@ import random
 from matplotlib import pyplot as plt
 import itertools
 import sys
+from collections import deque, namedtuple
 
 env = gym.make("Breakout-v0")
 
@@ -32,6 +33,8 @@ env = gym.make("Breakout-v0")
 #plt.show()
 
 VALID_ACTIONS = [0, 1, 2, 3]
+
+tf.reset_default_graph()
 
 # input_preprocessor graph
 input_state = tf.placeholder(shape=[210, 160, 3], dtype=tf.uint8)
@@ -155,7 +158,7 @@ def deep_q_learning(sess,
 	# get the current time step
 	total_t = sess.run(tf.contrib.framework.get_global_step())
 	# the epsilon decay schedule
-	epsilons = np.linespace(epsilon_start, epsilon_end, epsilon_decay_steps)
+	epsilons = np.linspace(epsilon_start, epsilon_end, epsilon_decay_steps)
 
 	# populating the replay memory with initial experience
 	state = env.reset()
@@ -166,12 +169,13 @@ def deep_q_learning(sess,
 		action = np.random.choice(np.arange(len(action_probs)), p=action_probs)
 		next_state, reward, done, _ = env.step(VALID_ACTIONS[action])
 		next_state = input_preprocessor(sess, next_state)
-		next_state = np.append(state[:,:,1,:], npp.expand_dims(next_state, 2), axis=2)
+		next_state = np.append(state[:,:,1:], np.expand_dims(next_state, 2), axis=2)
 		replay_memory.append(Transition(state, action, reward, next_state, done))
 		if done:
 			state = env.reset()
 			state = input_preprocessor(sess, state)
 			state = np.stack([state]*4, axis=2)
+			print "populating replay memory ... current episode: ", i
 
 	for i_episode in range(num_episodes):
 
@@ -192,8 +196,8 @@ def deep_q_learning(sess,
 				copy_model_parameters(sess)
 
 			# print out which step are we on
-			print "\rStep {} ({}) @ Episode {}/{}, loss: {}".format(
-				t, total_t, i_episode+1, num_episodes, loss), end="")
+			print("\rStep {} ({}) @ Episode {}/{}, loss: {}".format(
+                    t, total_t, i_episode + 1, num_episodes, loss))
 			sys.stdout.flush()
 
 			# take a step
@@ -201,7 +205,7 @@ def deep_q_learning(sess,
 			action = np.random.choice(np.arange(len(action_probs)), p=action_probs)
 			next_state, reward, done, _ = env.step(VALID_ACTIONS[action])
 			next_state = input_preprocessor(sess, next_state)
-			next_state = np.append(state[:,:,1,:], np.expand_dims(next_state, 2), axis=2)
+			next_state = np.append(state[:,:,1:], np.expand_dims(next_state, 2), axis=2)
 
 			# if replay memory is full, pop the first element
 			if len(replay_memory) == replay_memory_size:
@@ -228,21 +232,12 @@ def deep_q_learning(sess,
 			state = next_state
 			total_t += 1
 
+# create a glboal step variable
+global_step = tf.Variable(0, name='global_step', trainable=False)
 
 with tf.Session() as sess:
 	sess.run(tf.initialize_all_variables())
-	observation = env.reset()
-	observation_p = input_preprocessor(sess, observation)
-	observation = np.stack([observation_p]*4, axis=2)
-	observations = np.array([observation]*2)
-
-	# test predictions
-	print (predict(sess, observations, "estimator"))
-
-	# test training step
-	y = np.array([10.0, 10.0])
-	a = np.array([1, 3])
-	print (update(sess, observations, a, y))
+	deep_q_learning(sess, env, 10000)
 	
 	
 	
