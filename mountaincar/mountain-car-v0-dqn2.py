@@ -1,92 +1,139 @@
-# TO DO
+'''
+MountainCar-v0 solution using a Full DQN with experience-replay 
+and a separate Target network.
+'''
+ 
+import numpy as np
 import tensorflow as tf
 import gym
-import numpy as np
-import math
 import random
 import copy
+import math
 
 env = gym.make("MountainCar-v0")
+render = True # set to True for rendering
 
-learning_rate = 1e-2
-memory_size = 100000
+num_episodes = 10000
 batch_size = 64
+memory_size = 200
+H1 = 64
+D = 2
+learning_rate = 1e-2
 gamma = 0.99
-epsilon_max = 1
-epsilon_min = 0.1
+epsilon_max = 1.0
+epsilon_min = 0.01
 
 tf.reset_default_graph()
 
-# computation graph
-observations = tf.placeholder(tf.float32, [None, 2], name="input_x")
-W1 = tf.get_variable("W1", shape=[2, 64], initializer=tf.contrib.layers.xavier_initializer())
-layer1 = tf.nn.relu(tf.matmul(observations, W1))
-W2 = tf.get_variable("W2", shape=[64, 2], initializer=tf.contrib.layers.xavier_initializer())
-Qpredict = tf.matmul(layer1, W2)
+# normal network
+observations = tf.placeholder(tf.float32, [None,D], name="input_x")
+W1 = tf.get_variable("W1", shape=[D, H1],
+           initializer=tf.contrib.layers.xavier_initializer())
+layer1 = tf.nn.relu(tf.matmul(observations,W1))
 
-Qtarget = tf.placeholder(tf.float32, [None, 2], name="input_y")
-error = Qtarget - Qpredict
+W2 = tf.get_variable("W2", shape=[H1, 2],
+           initializer=tf.contrib.layers.xavier_initializer())
 
-# mean square error loss function
-loss = -tf.reduce_mean(tf.square(error))
+linear = tf.matmul(layer1, W2)
+#Qout = tf.nn.sigmoid(linear)
+Qout = linear
+
+Qtarget = tf.placeholder(tf.float32, [None, 2], name="Qtarget")
+
+# separate target network
+t_W1 = tf.get_variable("t_W1", shape=[D, H1],
+           initializer=tf.contrib.layers.xavier_initializer())
+t_layer1 = tf.nn.relu(tf.matmul(observations,t_W1))
+
+t_W2 = tf.get_variable("t_W2", shape=[H1, 2],
+           initializer=tf.contrib.layers.xavier_initializer())
+t_linear = tf.matmul(t_layer1, t_W2)
+t_Qout = t_linear
+
+
+# error
+diffs = Qtarget - Qout
+loss = -tf.reduce_mean(tf.square(diffs))
 adam = tf.train.AdamOptimizer(learning_rate).minimize(loss)
 
 init = tf.initialize_all_variables()
 
-# start the session
 with tf.Session() as sess:
-	sess.run(init)
-	state_memory = []
-	target_memory = []
-	for  _ in range(1000):
-		done = False
-		state = env.reset()
-		total_reward = 0
-		while done == False:
-			observation = np.reshape(state, [1, 2])
-			state_memory.append(observation)
-			_Qpredict = sess.run(Qpredict, feed_dict={observations: observation})
-			epsilon = epsilon_min + (epsilon_max - epsilon_min)*(math.exp(-0.001*_))
-			action_temp = 0
-			# chose action using e-greedy policy
-			if random.random() < epsilon:
-				action = random.randint(0, 1)
-				# map action 1 to 2(RIGHT) 
-				if action == 1:
-					action_temp = 2		
-				new_state, reward, done, info = env.step(action_temp)
-			else:
-				action = np.argmax(_Qpredict)
-				new_state, reward, done, info = env.step(action)
+    sess.run(init)
+    memory_states = []
+    memory_targets = []
+    for _ in xrange(num_episodes):
+        observation = env.reset()
+        done = False
+        ep_states = []
+        ep_targets = []
+        memory_states_temp = []
+        memory_targets_temp = []
+        i = 0
+        total_reward = 0
+        while done == False:
+            i += 1
+            #print i
+            state = np.reshape(observation, [1, D])
+            #print state
+            #ep_states.append(state)
+            memory_states.append(state)
+            #print memory_states
+            Qvals = sess.run(Qout, feed_dict={observations: state})
+            epsilon = epsilon_min + (epsilon_max - epsilon_min)*(math.exp(-0.01*_))
+            if random.random() < epsilon:
+                action = env.action_space.sample()
+                #print "RANDOM"
+            else:
+                action = np.argmax(Qvals)
+                #print "GREEDY"
+            
+            #take an e-greedy action
+            new_state, reward, done, info = env.step(action)
+            if render == True:
+                env.render()
 
-			total_reward += reward
-			#env.render()
+            total_reward += reward
+            nextQvals = sess.run(t_Qout, feed_dict={observations: np.reshape(new_state,[1, D])})
+            old_state = state
+            observation = new_state
+            maxQvals = np.max(nextQvals)
+            if done == False:
+                update = reward + (gamma*maxQvals)
+                #print total_reward
+            else:
+                update = reward
+            targetQvals = Qvals
+            targetQvals[0, action] = update
+            #ep_targets.append(targetQvals)
+            memory_targets.append(targetQvals)
 
-			_Qout = sess.run(Qpredict, feed_dict={observations: np.reshape(new_state, [1, 2])})
-			_maxQout = np.max(_Qout)
-			_Qtarget = _Qpredict[:]
+        memory_states_temp = copy.copy(memory_states)
+        memory_targets_temp = copy.copy(memory_targets)
 
-			if done == False:
-				update = reward + (gamma*_maxQout)
-			else:
-				update = reward
+        memory_states_temp = np.vstack(memory_states_temp)
+        memory_targets_temp = np.vstack(memory_targets_temp)
 
-			_Qtarget[0][action] = update
+        temp_list = zip(memory_states_temp, memory_targets_temp)
+        random.shuffle(temp_list)
+        ep_states, ep_targets = zip(*temp_list[:batch_size])
+        sess.run(adam, feed_dict={observations: ep_states, Qtarget: ep_targets})
+        if _ % memory_size == 0:
+            memory_states = []
+            memory_targets = []
 
-			target_memory.append(_Qtarget)
+        # update target network regularly but slowly
+        # copy the weights from the normal network in current episode
+        # to the target network
+        if _ % 100 == 0:
+            # update target network
+            t_W1 = tf.identity(W1)
+            t_W2 = tf.identity(W2)
 
-			# experience replay
-			sample_size = min(batch_size, len(state_memory))
-			
-			state_memory_temp = np.vstack(copy.copy(state_memory))
-			target_memory_temp = np.vstack(copy.copy(target_memory))
+        print "reward in episode ",_," is: ",total_reward
 
-			temp_list = zip(state_memory_temp, target_memory_temp)
-			random.shuffle(temp_list)
-			_states, _targets = zip(*temp_list)
-			sess.run(adam, feed_dict={observations: _states, Qtarget: _targets})
 
-			if state_memory >= memory_size:
-				state_memory = []
-				target_memory = []
-		print "reward in episode ",_, " is ", total_reward
+
+
+
+
