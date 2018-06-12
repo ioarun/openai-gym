@@ -10,9 +10,14 @@ import tensorflow as tf
 import numpy as np
 import gym
 import math
+import csv
 
 env = gym.make("CartPole-v0")
 env.reset()
+
+writer_file = open('rewards_pg1.csv', 'wt')
+writer = csv.writer(writer_file)
+writer.writerow(['total_rewards_0'])
 
 H = 10
 batch_size = 50
@@ -43,7 +48,6 @@ w2grad = tf.placeholder(tf.float32, name="batch_grad2")
 batchgrads = [w1grad, w2grad]
 updategrads = adam.apply_gradients(zip(batchgrads, tvars))
 
-
 def discount_rewards(r):
 	discounted_r = np.zeros_like(r)
 	running_add = 0
@@ -71,12 +75,12 @@ with tf.Session() as sess:
     gradBuffer = sess.run(tvars)
     for ix,grad in enumerate(gradBuffer):
         gradBuffer[ix] = grad * 0
-    
+
     while episode_number <= total_episodes:
        	
-        if reward_sum/batch_size > 100 or rendering == True : 
-            env.render()
-            rendering = True
+        # if reward_sum/batch_size > 100 or rendering == True : 
+        #     env.render()
+        #     rendering = True
         
         # Make sure the observation is in a shape the network can handle.
         x = np.reshape(observation,[1,D])
@@ -116,17 +120,18 @@ with tf.Session() as sess:
             tGrad = sess.run(newGrads,feed_dict={observations: epx, input_y: epy, advantages: discounted_epr})
             for ix,grad in enumerate(tGrad):
                 gradBuffer[ix] += grad
-                
+
             # If we have completed enough episodes, then update the policy network with our gradients.
-            if episode_number % batch_size == 0: 
+            if episode_number % batch_size == 0:
                 sess.run(updategrads,feed_dict={w1grad: gradBuffer[0],w2grad:gradBuffer[1]})
                 for ix,grad in enumerate(gradBuffer):
                     gradBuffer[ix] = grad * 0
                 
                 # Give a summary of how well our network is doing for each batch of episodes.
                 running_reward = reward_sum if running_reward is None else running_reward * 0.99 + reward_sum * 0.01
-                print ('Average reward for episode %f.  Total average reward %f.' % (reward_sum/batch_size, running_reward/batch_size))
-                
+                print ('Average reward for episode %f is :%f.  Total average reward %f.' % (episode_number, reward_sum/batch_size, running_reward/batch_size))
+                writer.writerow([reward_sum/batch_size])
+
                 if reward_sum/batch_size > 200: 
                     print ("Task solved in",episode_number,'episodes!')
                     break

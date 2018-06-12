@@ -9,6 +9,7 @@ import gym
 import random
 import copy
 import math
+import csv
 
 env = gym.make("CartPole-v0")
 render = True # set to True for rendering
@@ -22,6 +23,10 @@ learning_rate = 1e-2
 gamma = 0.99
 epsilon_max = 1.0
 epsilon_min = 0.01
+
+file = open('test.csv', 'wb')
+csv_writer = csv.writer(file, delimiter=' ', quotechar='|', quoting=csv.QUOTE_MINIMAL)
+csv_writer.writerow(('total_rewards'))
 
 tf.reset_default_graph()
 
@@ -50,7 +55,6 @@ t_W2 = tf.get_variable("t_W2", shape=[H1, 2],
 t_linear = tf.matmul(t_layer1, t_W2)
 t_Qout = t_linear
 
-
 # error
 diffs = Qtarget - Qout
 loss = -tf.reduce_mean(tf.square(diffs))
@@ -75,6 +79,7 @@ with tf.Session() as sess:
             i += 1
             #print i
             state = np.reshape(observation, [1, D])
+            print state
             #print state
             #ep_states.append(state)
             memory_states.append(state)
@@ -130,6 +135,7 @@ with tf.Session() as sess:
             t_W1 = tf.identity(W1)
             t_W2 = tf.identity(W2)
 
+        csv_writer.writerow((str(total_reward)))
         print "reward in episode ",_," is: ",total_reward
 
 

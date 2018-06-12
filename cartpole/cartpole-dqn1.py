@@ -10,7 +10,7 @@ import copy
 import math
 
 env = gym.make("CartPole-v0")
-render = False # set to True for rendering
+render = True # set to True for rendering
 
 num_episodes = 10000
 batch_size = 64
